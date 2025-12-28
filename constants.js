@@ -1,4 +1,4 @@
-import { PlaneType } from './types.js'; // Changed to .js extension
+import { PlaneType } from './types.js'; // Ensure .js extension
 
 export const SPAWN_RATE_INITIAL = 2000; // ms
 export const SPAWN_RATE_MIN = 800;
