@@ -1,42 +1,34 @@
-import { GoogleGenAI } from "@google/genai"; // Fix: Added import for GoogleGenAI client.
+import { GoogleGenAI } from "@google/genai";
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Play, RotateCcw, Pause, Trophy } from 'lucide-react';
-import { Plane, Runway, Point, GameState, PlaneType, Explosion } from './types';
-import { COLORS, PLANE_SPEED, LANDING_SPEED, COLLISION_RADIUS, SPAWN_RATE_INITIAL, SPAWN_RATE_MIN } from './constants';
-import { playSound, selectSound, landSound, crashSound } from './sounds'; // Import sound utilities
+import { PlaneType, GameState } from './types.js'; // Ensure .js extension for types
+import { COLORS, PLANE_SPEED, LANDING_SPEED, COLLISION_RADIUS, SPAWN_RATE_INITIAL, SPAWN_RATE_MIN } from './constants.js'; // Ensure .js extension
+import { playSound, selectSound, landSound, crashSound } from './sounds.js'; // Ensure .js extension
 
-// Fix: Initialized GoogleGenAI client with API key from environment variables as per guidelines.
-// This addresses the common "Expected 1 arguments, but got 0" error when GoogleGenAI is instantiated without the required config object.
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 const HIGH_SCORE_KEY = 'sky-guide-high-score';
 
-const App: React.FC = () => {
-  // UI State
-  const [gameState, setGameState] = useState<GameState>(GameState.MENU);
+const App = () => {
+  const [gameState, setGameState] = useState(GameState.MENU);
   const [score, setScore] = useState(0);
   const [lives, setLives] = useState(2);
   const [highScore, setHighScore] = useState(0);
   
-  // Refs for Game Logic (mutable state without re-renders)
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  // Fix: Explicitly set `useRef` type to `number | undefined` and provide an initial `undefined` value.
-  // This resolves the TypeScript error "Expected 1 arguments, but got 0" that can occur when `useRef` is used without an initial value and a specific generic type.
-  const requestRef = useRef<number | undefined>(undefined);
-  const planesRef = useRef<Plane[]>([]);
-  const explosionsRef = useRef<Explosion[]>([]);
-  const lastSpawnTime = useRef<number>(0);
-  const spawnRate = useRef<number>(SPAWN_RATE_INITIAL);
-  const runwaysRef = useRef<Runway[]>([]);
+  const canvasRef = useRef(null);
+  const requestRef = useRef(undefined); // Corrected to match TS type for useRef
+  const planesRef = useRef([]);
+  const explosionsRef = useRef([]);
+  const lastSpawnTime = useRef(0);
+  const spawnRate = useRef(SPAWN_RATE_INITIAL);
+  const runwaysRef = useRef([]);
   const scoreRef = useRef(0);
   const livesRef = useRef(2);
   const isPausedRef = useRef(false);
   
-  // Touch handling refs
-  const activePlaneId = useRef<string | null>(null);
-  const currentPath = useRef<Point[]>([]);
+  const activePlaneId = useRef(null);
+  const currentPath = useRef([]);
 
-  // Load High Score on Mount
   useEffect(() => {
     const saved = localStorage.getItem(HIGH_SCORE_KEY);
     if (saved) {
@@ -44,7 +36,6 @@ const App: React.FC = () => {
     }
   }, []);
 
-  // Initialize Game
   const initGame = useCallback(() => {
     planesRef.current = [];
     explosionsRef.current = [];
@@ -57,16 +48,14 @@ const App: React.FC = () => {
     setScore(0);
     setLives(2);
     
-    // Setup Runways based on screen size (handled in resize, but init needs empty)
     if (canvasRef.current) {
       setupRunways(canvasRef.current);
     }
   }, []);
 
-  const setupRunways = (canvas: HTMLCanvasElement) => {
+  const setupRunways = (canvas) => {
     const { width, height } = canvas;
     
-    // Create 2 runways: Red and Blue
     const cx = width / 2;
     const cy = height / 2;
     
@@ -77,9 +66,8 @@ const App: React.FC = () => {
         y: cy,
         width: 40,
         height: 180,
-        angle: 0, // Red runway: vertical, entry from bottom (positive Y in world space)
-        entryPoint: { x: cx - 80, y: cy + 90 }, // Bottom entry
-        // Add the missing 'type' property as required by the Runway interface
+        angle: 0,
+        entryPoint: { x: cx - 80, y: cy + 90 },
         type: PlaneType.RED, 
       },
       {
@@ -88,45 +76,42 @@ const App: React.FC = () => {
         y: cy,
         width: 40,
         height: 180,
-        angle: Math.PI, // Blue runway: vertical, entry from top (negative Y in world space)
-        entryPoint: { x: cx + 80, y: cy - 90 }, // Top entry
-        // Add the missing 'type' property as required by the Runway interface
+        angle: Math.PI,
+        entryPoint: { x: cx + 80, y: cy - 90 },
         type: PlaneType.BLUE,
       }
     ];
   };
 
-  // Spawning Logic
-  const spawnPlane = (currentTime: number, width: number, height: number) => {
+  const spawnPlane = (currentTime, width, height) => {
     if (currentTime - lastSpawnTime.current > spawnRate.current) {
-      const edge = Math.floor(Math.random() * 4); // 0: top, 1: right, 2: bottom, 3: left
+      const edge = Math.floor(Math.random() * 4);
       let x = 0, y = 0, angle = 0;
       const buffer = 30;
 
       switch(edge) {
-        case 0: // Top
+        case 0:
           x = Math.random() * width;
           y = -buffer;
           angle = Math.PI / 2;
           break;
-        case 1: // Right
+        case 1:
           x = width + buffer;
           y = Math.random() * height;
           angle = Math.PI;
           break;
-        case 2: // Bottom
+        case 2:
           x = Math.random() * width;
           y = height + buffer;
           angle = -Math.PI / 2;
           break;
-        case 3: // Left
+        case 3:
           x = -buffer;
           y = Math.random() * height;
           angle = 0;
           break;
       }
 
-      // Add randomness to angle to point somewhat towards center
       const angleToCenter = Math.atan2((height/2) - y, (width/2) - x);
       angle = angleToCenter + (Math.random() - 0.5) * 0.5;
 
@@ -146,13 +131,11 @@ const App: React.FC = () => {
       });
 
       lastSpawnTime.current = currentTime;
-      // Increase difficulty
       spawnRate.current = Math.max(SPAWN_RATE_MIN, spawnRate.current - 10);
     }
   };
 
-  // Main Game Loop
-  const loop = useCallback((time: number) => {
+  const loop = useCallback((time) => {
     if (gameState !== GameState.PLAYING || isPausedRef.current) {
       requestRef.current = requestAnimationFrame(loop);
       return;
@@ -165,11 +148,9 @@ const App: React.FC = () => {
 
     const { width, height } = canvas;
 
-    // 1. Clear
-    ctx.fillStyle = '#1e293b'; // Slate 800 background
+    ctx.fillStyle = '#1e293b';
     ctx.fillRect(0, 0, width, height);
 
-    // Draw Grid (Decoration)
     ctx.strokeStyle = '#334155';
     ctx.lineWidth = 1;
     ctx.beginPath();
@@ -177,20 +158,16 @@ const App: React.FC = () => {
     for(let i=0; i<height; i+=50) { ctx.moveTo(0,i); ctx.lineTo(width,i); }
     ctx.stroke();
 
-    // 2. Spawn
     spawnPlane(time, width, height);
 
-    // 3. Draw Runways
     runwaysRef.current.forEach(runway => {
       ctx.save();
       ctx.translate(runway.x, runway.y);
       ctx.rotate(runway.angle);
       
-      // Runway body
       ctx.fillStyle = '#475569';
       ctx.fillRect(-runway.width/2, -runway.height/2, runway.width, runway.height);
       
-      // Markings
       ctx.strokeStyle = COLORS[runway.type];
       ctx.lineWidth = 4;
       ctx.setLineDash([10, 10]);
@@ -200,30 +177,22 @@ const App: React.FC = () => {
       ctx.stroke();
       ctx.setLineDash([]);
 
-      // Threshold highlight
       ctx.fillStyle = COLORS[runway.type];
       ctx.globalAlpha = 0.3;
-      // For runway 1 (Red, angle 0), entry is at local y = runway.height/2.
-      // For runway 2 (Blue, angle PI), entry is at local y = -runway.height/2.
-      // We want to highlight the entry end.
       const entryHighlightY = runway.type === PlaneType.RED ? runway.height/2 - 20 : -runway.height/2;
       ctx.fillRect(-runway.width/2, entryHighlightY, runway.width, 20);
-      ctx.globalAlpha = 1; // Reset alpha
+      ctx.globalAlpha = 1;
       
       ctx.restore();
     });
 
-    // Planes that crashed this frame (for deducting only 1 life per event)
-    const planesCrashedInThisFrame = new Set<string>();
+    const planesCrashedInThisFrame = new Set();
 
-    // 4. Update & Draw Planes
-    // Filter out landed or crashed planes effectively for next frame
     const activePlanes = [];
 
     for (const plane of planesRef.current) {
       if (plane.state === 'CRASHED' || plane.state === 'LANDED') continue;
 
-      // Logic: Movement
       if (plane.state === 'FLYING') {
         if (plane.path.length > 0) {
           const target = plane.path[0];
@@ -231,12 +200,10 @@ const App: React.FC = () => {
           const dy = target.y - plane.y;
           const dist = Math.hypot(dx, dy);
           
-          if (dist < 5) { // Reached point, small threshold
+          if (dist < 5) {
             plane.path.shift(); 
           } else {
-            // Turn towards target
             const targetAngle = Math.atan2(dy, dx);
-            // Smooth turning
             let diff = targetAngle - plane.angle;
             while (diff < -Math.PI) diff += Math.PI * 2;
             while (diff > Math.PI) diff -= Math.PI * 2;
@@ -244,87 +211,74 @@ const App: React.FC = () => {
           }
         }
         
-        // Move
         plane.x += Math.cos(plane.angle) * plane.speed;
         plane.y += Math.sin(plane.angle) * plane.speed;
 
-        // Check Landing Trigger
         for (const runway of runwaysRef.current) {
           if (plane.type !== runway.type) continue;
           
-          // Distance to entry point
           const distToEntry = Math.hypot(plane.x - runway.entryPoint.x, plane.y - runway.entryPoint.y);
           if (distToEntry < 20 && plane.state === 'FLYING') {
-            // Check alignment (angle diff should be small)
             let requiredAngle;
-            if (runway.type === PlaneType.RED) { // Red runway (angle 0), entry from bottom means plane needs to fly up (+Y)
-              requiredAngle = -Math.PI / 2; // Pointing upwards (towards -Y on canvas)
-            } else { // Blue runway (angle PI), entry from top means plane needs to fly down (-Y)
-              requiredAngle = Math.PI / 2; // Pointing downwards (towards +Y on canvas)
+            if (runway.type === PlaneType.RED) {
+              requiredAngle = -Math.PI / 2;
+            } else {
+              requiredAngle = Math.PI / 2;
             }
 
             let angleDiff = Math.abs(plane.angle - requiredAngle);
             while (angleDiff > Math.PI) angleDiff = Math.PI * 2 - angleDiff;
             
-            if (angleDiff < 0.2) { // Within 0.2 radians (approx 11 degrees)
+            if (angleDiff < 0.2) {
               plane.state = 'LANDING';
               plane.landingProgress = 0;
-              plane.path = []; // Clear path once landing
-              // Sound is played once landing officially starts.
+              plane.path = [];
             }
           }
         }
       } else if (plane.state === 'LANDING') {
-        // Find the runway it's landing on, by type
         const runway = runwaysRef.current.find(r => r.type === plane.type);
         if (runway) {
-          // Progress the plane along the runway from its entry point
           let landingDirectionAngle;
 
-          if (runway.type === PlaneType.RED) { // Red runway, angle 0, entry from bottom
-            landingDirectionAngle = -Math.PI / 2; // Fly towards negative Y
-          } else { // Blue runway, angle PI, entry from top
-            landingDirectionAngle = Math.PI / 2; // Fly towards positive Y
+          if (runway.type === PlaneType.RED) {
+            landingDirectionAngle = -Math.PI / 2;
+          } else {
+            landingDirectionAngle = Math.PI / 2;
           }
 
           plane.x += Math.cos(landingDirectionAngle) * LANDING_SPEED;
           plane.y += Math.sin(landingDirectionAngle) * LANDING_SPEED;
-          plane.angle = landingDirectionAngle; // Keep aligned with runway
+          plane.angle = landingDirectionAngle;
 
-          // Landing progress calculation (aim for ~2 seconds for full landing)
-          const landingDurationFrames = 60 * 2; // 2 seconds at 60fps
+          const landingDurationFrames = 60 * 2;
           plane.landingProgress += (1 / landingDurationFrames); 
 
           if (plane.landingProgress >= 1) {
             plane.state = 'LANDED';
             scoreRef.current += 100;
             setScore(scoreRef.current);
-            playSound(landSound, 0.5); // Play land sound when landing completes
+            playSound(landSound, 0.5);
           }
         } else {
-          // This "else" case should ideally not be hit if runway setup is correct,
-          // but as a fallback, mark as crashed.
           plane.state = 'CRASHED';
           explosionsRef.current.push({ id: Math.random().toString(36).substr(2, 9), x: plane.x, y: plane.y, radius: 0, opacity: 1 });
           playSound(crashSound, 0.7);
-          planesCrashedInThisFrame.add(plane.id); // Add to crashed set
+          planesCrashedInThisFrame.add(plane.id);
         }
       }
 
       activePlanes.push(plane);
     }
     
-    // Process collisions after all planes have updated their positions but before drawing
     for (let i = 0; i < activePlanes.length; i++) {
         for (let j = i + 1; j < activePlanes.length; j++) {
             const p1 = activePlanes[i];
             const p2 = activePlanes[j];
             
-            // Only flying planes can collide
             if (p1.state === 'FLYING' && p2.state === 'FLYING') {
                 const dist = Math.hypot(p1.x - p2.x, p1.y - p2.y);
                 if (dist < COLLISION_RADIUS * 2) {
-                    // CRASH!
                     p1.state = 'CRASHED';
                     p2.state = 'CRASHED';
                     
@@ -335,13 +289,12 @@ const App: React.FC = () => {
                         { id: p1.id, x: p1.x, y: p1.y, radius: 10, opacity: 1 },
                         { id: p2.id, x: p2.x, y: p2.y, radius: 10, opacity: 1 }
                     );
-                    playSound(crashSound, 0.5); // Play crash sound
+                    playSound(crashSound, 0.5);
                 }
             }
         }
     }
 
-    // Deduct lives once per frame if any new planes crashed
     if (planesCrashedInThisFrame.size > 0) {
         livesRef.current -= 1;
         setLives(livesRef.current);
@@ -350,39 +303,30 @@ const App: React.FC = () => {
         }
     }
 
-    // Logic: Out of Bounds (only flying planes with no path should crash)
     planesRef.current.forEach(plane => {
         if (plane.state === 'FLYING' && plane.path.length === 0) {
-            const margin = 100; // Define how far off-screen a plane can go without a path
+            const margin = 100;
             if (plane.x < -margin || plane.x > width + margin || plane.y < -margin || plane.y > height + margin) {
-                if (!planesCrashedInThisFrame.has(plane.id)) { // Prevent double-counting if already crashed by collision
+                if (!planesCrashedInThisFrame.has(plane.id)) {
                   plane.state = 'CRASHED';
                   explosionsRef.current.push({ id: plane.id, x: plane.x, y: plane.y, radius: 10, opacity: 1 });
                   playSound(crashSound, 0.5);
-                  planesCrashedInThisFrame.add(plane.id); // Mark as crashed for life deduction
+                  planesCrashedInThisFrame.add(plane.id);
                 }
             }
         }
     });
 
-    // Re-deduct lives for out-of-bounds planes (if not already handled by collision)
     if (planesCrashedInThisFrame.size > 0 && livesRef.current > 0) {
-      // We already deducted 1 life for collision. If more planes crashed OOB, we don't want to deduct more lives for this frame.
-      // This is a single deduction for any crash events this frame.
-      // The `if (planesCrashedInThisFrame.size > 0)` block above handles the single life deduction for all crashes in a frame.
     }
 
-
-    // Draw Planes (updated planesRef.current from activePlanes)
-    planesRef.current = activePlanes; // Update to contain only planes that haven't landed or crashed yet
+    planesRef.current = activePlanes;
 
     for (const plane of planesRef.current) {
-        // Draw Plane
         ctx.save();
         ctx.translate(plane.x, plane.y);
         ctx.rotate(plane.angle);
 
-        // Body
         ctx.fillStyle = COLORS[plane.type];
         ctx.beginPath();
         ctx.moveTo(15, 0);
@@ -392,7 +336,6 @@ const App: React.FC = () => {
         ctx.closePath();
         ctx.fill();
 
-        // Cockpit
         ctx.fillStyle = '#fff';
         ctx.beginPath();
         ctx.arc(5, 0, 4, 0, Math.PI * 2);
@@ -401,11 +344,10 @@ const App: React.FC = () => {
         if (plane.isSelected) {
             ctx.strokeStyle = '#fff';
             ctx.lineWidth = 2;
-            ctx.strokeRect(-20, -15, 40, 30); // Simple bounding box for selection
+            ctx.strokeRect(-20, -15, 40, 30);
         }
         ctx.restore();
 
-        // Draw Path
         if (plane.path.length > 0) {
             ctx.beginPath();
             ctx.moveTo(plane.x, plane.y);
@@ -419,7 +361,6 @@ const App: React.FC = () => {
     }
 
 
-    // 5. Update & Draw Explosions
     explosionsRef.current = explosionsRef.current.map(exp => {
       exp.radius += 1;
       exp.opacity -= 0.02;
@@ -427,18 +368,16 @@ const App: React.FC = () => {
     }).filter(exp => exp.opacity > 0);
 
     explosionsRef.current.forEach(exp => {
-      ctx.fillStyle = `rgba(255, 69, 0, ${exp.opacity})`; // Orange red
+      ctx.fillStyle = `rgba(255, 69, 0, ${exp.opacity})`;
       ctx.beginPath();
       ctx.arc(exp.x, exp.y, exp.radius, 0, Math.PI * 2);
       ctx.fill();
     });
 
-    // Draw Current Drawing Path (The line being dragged)
     if (activePlaneId.current && currentPath.current.length > 0) {
         ctx.beginPath();
-        // Start from plane position
         const p = planesRef.current.find(pl => pl.id === activePlaneId.current);
-        if (p) { // Check if the plane still exists (e.g., hasn't crashed in this frame)
+        if (p) {
             ctx.moveTo(p.x, p.y);
             currentPath.current.forEach(point => {
                 ctx.lineTo(point.x, point.y);
@@ -451,9 +390,8 @@ const App: React.FC = () => {
         }
     }
 
-    // 6. Request next frame
     requestRef.current = requestAnimationFrame(loop);
-  }, [gameState, setScore, setLives, setGameState]); // Dependencies
+  }, [gameState, setScore, setLives, setGameState]);
 
   const endGame = useCallback(() => {
     setGameState(GameState.GAME_OVER);
@@ -465,17 +403,15 @@ const App: React.FC = () => {
     });
   }, [scoreRef, setHighScore]);
 
-  // Effect for game loop
   useEffect(() => {
     if (gameState === GameState.PLAYING && !isPausedRef.current) {
       requestRef.current = requestAnimationFrame(loop);
     } else {
-      cancelAnimationFrame(requestRef.current!);
+      cancelAnimationFrame(requestRef.current);
     }
-    return () => cancelAnimationFrame(requestRef.current!);
+    return () => cancelAnimationFrame(requestRef.current);
   }, [gameState, loop]);
 
-  // Effect for canvas resizing
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -484,18 +420,17 @@ const App: React.FC = () => {
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
       if (gameState === GameState.PLAYING || gameState === GameState.MENU) {
-        setupRunways(canvas); // Re-setup runways on resize
+        setupRunways(canvas);
       }
     };
 
-    resizeCanvas(); // Initial resize
+    resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
 
     return () => window.removeEventListener('resize', resizeCanvas);
   }, [gameState, setupRunways]);
 
-  // Touch/Mouse handlers
-  const handlePointerDown = useCallback((event: React.PointerEvent<HTMLCanvasElement>) => {
+  const handlePointerDown = useCallback((event) => {
     if (gameState !== GameState.PLAYING || isPausedRef.current) return;
 
     const canvas = canvasRef.current;
@@ -508,18 +443,16 @@ const App: React.FC = () => {
       Math.hypot(plane.x - touchX, plane.y - touchY) < COLLISION_RADIUS && plane.state === 'FLYING'
     );
 
-    // If there was an active plane, finalize its path
     if (activePlaneId.current) {
       const prevActivePlane = planesRef.current.find(p => p.id === activePlaneId.current);
       if (prevActivePlane) {
         prevActivePlane.path = [...currentPath.current];
         prevActivePlane.isSelected = false;
       }
-      activePlaneId.current = null; // Clear active plane ID
-      currentPath.current = [];     // Clear path being drawn
+      activePlaneId.current = null;
+      currentPath.current = [];
     }
 
-    // If a new plane was clicked, activate it
     if (clickedPlane) {
       clickedPlane.isSelected = true;
       activePlaneId.current = clickedPlane.id;
@@ -528,7 +461,7 @@ const App: React.FC = () => {
     }
   }, [gameState]);
 
-  const handlePointerMove = useCallback((event: React.PointerEvent<HTMLCanvasElement>) => {
+  const handlePointerMove = useCallback((event) => {
     if (gameState !== GameState.PLAYING || isPausedRef.current || !activePlaneId.current) return;
 
     const canvas = canvasRef.current;
@@ -539,7 +472,7 @@ const App: React.FC = () => {
 
     if (currentPath.current.length > 0) {
       const lastPoint = currentPath.current[currentPath.current.length - 1];
-      if (Math.hypot(lastPoint.x - touchX, lastPoint.y - touchY) > 15) { // Only add if far enough
+      if (Math.hypot(lastPoint.x - touchX, lastPoint.y - touchY) > 15) {
         currentPath.current.push({ x: touchX, y: touchY });
       }
     }
@@ -551,7 +484,7 @@ const App: React.FC = () => {
     const selectedPlane = planesRef.current.find(p => p.id === activePlaneId.current);
     if (selectedPlane) {
       selectedPlane.path = currentPath.current;
-      selectedPlane.isSelected = false; // Deselect after path is set
+      selectedPlane.isSelected = false;
     }
     activePlaneId.current = null;
     currentPath.current = [];
@@ -560,7 +493,7 @@ const App: React.FC = () => {
   const handlePauseToggle = useCallback(() => {
     isPausedRef.current = !isPausedRef.current;
     if (isPausedRef.current) {
-      cancelAnimationFrame(requestRef.current!);
+      cancelAnimationFrame(requestRef.current);
     } else if (gameState === GameState.PLAYING) {
       requestRef.current = requestAnimationFrame(loop);
     }
@@ -581,60 +514,104 @@ const App: React.FC = () => {
   }, [initGame]);
 
   return (
-    <div className="relative w-screen h-screen overflow-hidden bg-slate-800 text-white font-mono">
-      <canvas
-        ref={canvasRef}
-        className="block"
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerLeave={handlePointerUp} // Treat leaving canvas as pointer up
-      />
-
-      {gameState === GameState.MENU && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black bg-opacity-70">
-          <h1 className="text-6xl font-bold mb-8 text-indigo-400">Sky Guide</h1>
-          <button
-            onClick={handleStartGame}
-            className="px-8 py-4 bg-indigo-600 hover:bg-indigo-700 text-white text-2xl rounded-lg shadow-lg flex items-center gap-2"
-          >
-            <Play size={28} /> Start Game
-          </button>
-          <div className="mt-8 text-xl">High Score: {highScore}</div>
-        </div>
-      )}
-
-      {gameState === GameState.PLAYING && (
-        <>
-          <div className="absolute top-4 left-4 text-xl">Score: {score}</div>
-          <div className="absolute top-4 right-4 text-xl">Lives: {lives}</div>
-          <div className="absolute bottom-4 left-4 flex gap-4">
-            <button
-              onClick={handlePauseToggle}
-              className="p-3 bg-slate-700 hover:bg-slate-600 rounded-full shadow-md"
-            >
-              {isPausedRef.current ? <Play size={24} /> : <Pause size={24} />}
-            </button>
-          </div>
-        </>
-      )}
-
-      {gameState === GameState.GAME_OVER && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black bg-opacity-70">
-          <h2 className="text-5xl font-bold mb-4 text-red-400">Game Over!</h2>
-          <p className="text-3xl mb-4">Final Score: {score}</p>
-          <p className="text-2xl mb-8 flex items-center gap-2">
-            <Trophy size={28} /> High Score: {Math.max(score, highScore)}
-          </p>
-          <button
-            onClick={handleRestartGame}
-            className="px-8 py-4 bg-emerald-600 hover:bg-emerald-700 text-white text-2xl rounded-lg shadow-lg flex items-center gap-2"
-          >
-            <RotateCcw size={28} /> Play Again
-          </button>
-        </div>
-      )}
-    </div>
+    React.createElement(
+      "div",
+      { className: "relative w-screen h-screen overflow-hidden bg-slate-800 text-white font-mono" },
+      React.createElement("canvas", {
+        ref: canvasRef,
+        className: "block",
+        onPointerDown: handlePointerDown,
+        onPointerMove: handlePointerMove,
+        onPointerUp: handlePointerUp,
+        onPointerLeave: handlePointerUp
+      }),
+      gameState === GameState.MENU &&
+        React.createElement(
+          "div",
+          { className: "absolute inset-0 flex flex-col items-center justify-center bg-black bg-opacity-70" },
+          React.createElement(
+            "h1",
+            { className: "text-6xl font-bold mb-8 text-indigo-400" },
+            "Sky Guide"
+          ),
+          React.createElement(
+            "button",
+            {
+              onClick: handleStartGame,
+              className: "px-8 py-4 bg-indigo-600 hover:bg-indigo-700 text-white text-2xl rounded-lg shadow-lg flex items-center gap-2"
+            },
+            React.createElement(Play, { size: 28 }),
+            " Start Game"
+          ),
+          React.createElement(
+            "div",
+            { className: "mt-8 text-xl" },
+            "High Score: ",
+            highScore
+          )
+        ),
+      gameState === GameState.PLAYING &&
+        React.createElement(
+          React.Fragment,
+          null,
+          React.createElement(
+            "div",
+            { className: "absolute top-4 left-4 text-xl" },
+            "Score: ",
+            score
+          ),
+          React.createElement(
+            "div",
+            { className: "absolute top-4 right-4 text-xl" },
+            "Lives: ",
+            lives
+          ),
+          React.createElement(
+            "div",
+            { className: "absolute bottom-4 left-4 flex gap-4" },
+            React.createElement(
+              "button",
+              {
+                onClick: handlePauseToggle,
+                className: "p-3 bg-slate-700 hover:bg-slate-600 rounded-full shadow-md"
+              },
+              isPausedRef.current ? React.createElement(Play, { size: 24 }) : React.createElement(Pause, { size: 24 })
+            )
+          )
+        ),
+      gameState === GameState.GAME_OVER &&
+        React.createElement(
+          "div",
+          { className: "absolute inset-0 flex flex-col items-center justify-center bg-black bg-opacity-70" },
+          React.createElement(
+            "h2",
+            { className: "text-5xl font-bold mb-4 text-red-400" },
+            "Game Over!"
+          ),
+          React.createElement(
+            "p",
+            { className: "text-3xl mb-4" },
+            "Final Score: ",
+            score
+          ),
+          React.createElement(
+            "p",
+            { className: "text-2xl mb-8 flex items-center gap-2" },
+            React.createElement(Trophy, { size: 28 }),
+            " High Score: ",
+            Math.max(score, highScore)
+          ),
+          React.createElement(
+            "button",
+            {
+              onClick: handleRestartGame,
+              className: "px-8 py-4 bg-emerald-600 hover:bg-emerald-700 text-white text-2xl rounded-lg shadow-lg flex items-center gap-2"
+            },
+            React.createElement(RotateCcw, { size: 28 }),
+            " Play Again"
+          )
+        )
+    )
   );
 };
 
