@@ -1,11 +1,8 @@
-import { GoogleGenAI } from "@google/genai";
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Play, RotateCcw, Pause, Trophy } from 'lucide-react';
 import { PlaneType, GameState } from './types.js'; // Ensure .js extension for types
 import { COLORS, PLANE_SPEED, LANDING_SPEED, COLLISION_RADIUS, SPAWN_RATE_INITIAL, SPAWN_RATE_MIN } from './constants.js'; // Ensure .js extension
 import { playSound, selectSound, landSound, crashSound } from './sounds.js'; // Ensure .js extension
-
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 const HIGH_SCORE_KEY = 'sky-guide-high-score';
 
