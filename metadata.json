@@ -1,0 +1,5 @@
+{
+  "name": "Sky Guide: Flight Director",
+  "description": "A mobile-first touch game where you guide planes to their color-coded runways. Draw paths to land them safely and avoid collisions.",
+  "requestFramePermissions": []
+}
