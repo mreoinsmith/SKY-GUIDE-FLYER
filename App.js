@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Play, RotateCcw, Pause, Trophy } from 'lucide-react';
 import { PlaneType, GameState } from './types.js'; // Ensure .js extension for types
-import { COLORS, PLANE_SPEED, LANDING_SPEED, COLLISION_RADIUS, SPAWN_RATE_INITIAL, SPAWN_RATE_MIN } from './constants.js'; // Ensure .js extension
+import { COLORS, PLANE_SPEED, LANDING_SPEED, COLLISION_RADIUS, SPAWN_RATE_INITIAL, SPAWN_RATE_MIN, MAX_PLANE_TURN_PER_FRAME, PATH_SMOOTHING } from './constants.js'; // Ensure .js extension
 import { playSound, selectSound, landSound, crashSound } from './sounds.js'; // Ensure .js extension
 
 const HIGH_SCORE_KEY = 'sky-guide-high-score';
@@ -204,7 +204,13 @@ const App = () => {
             let diff = targetAngle - plane.angle;
             while (diff < -Math.PI) diff += Math.PI * 2;
             while (diff > Math.PI) diff -= Math.PI * 2;
-            plane.angle += diff * 0.1; 
+            
+            // Apply angular correction. Limit the turn speed to prevent overshooting or jerky movements.
+            let turnAmount = diff;
+            if (Math.abs(turnAmount) > MAX_PLANE_TURN_PER_FRAME) {
+                turnAmount = Math.sign(turnAmount) * MAX_PLANE_TURN_PER_FRAME;
+            }
+            plane.angle += turnAmount;
           }
         }
         
@@ -469,7 +475,7 @@ const App = () => {
 
     if (currentPath.current.length > 0) {
       const lastPoint = currentPath.current[currentPath.current.length - 1];
-      if (Math.hypot(lastPoint.x - touchX, lastPoint.y - touchY) > 15) {
+      if (Math.hypot(lastPoint.x - touchX, lastPoint.y - touchY) > PATH_SMOOTHING) { // Use PATH_SMOOTHING constant
         currentPath.current.push({ x: touchX, y: touchY });
       }
     }
